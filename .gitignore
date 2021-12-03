@@ -3,3 +3,4 @@ docs/
 badgerdb_main
 lib/
 obj/
+rel*
