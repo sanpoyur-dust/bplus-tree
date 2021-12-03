@@ -31,8 +31,50 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		BufMgr *bufMgrIn,
 		const int attrByteOffset,
 		const Datatype attrType)
+		: bufMgr(bufMgrIn)
+		, attributeType(attrType)
+		, attrByteOffset(attrByteOffset)
+		, leafOccupancy(INTARRAYLEAFSIZE)
+		, nodeOccupancy(INTARRAYNONLEAFSIZE)
 {
+	std::ostringstream idxStr;
+	idxStr << relationName << '.' << attrByteOffset;
+	std::string indexName = idxStr.str();  // index file name
+	outIndexName = indexName;  // return the index file name via reference
 
+	Page *headerPage;  // header page
+	Page *rootPage;    // root page
+
+	if (!File::exists(indexName))
+	{
+		// create a new index file if it doesn't exist
+		file = new BlobFile(indexName, true);
+
+		// allocate the header page and root page
+		bufMgr->allocPage(file, headerPageNum, headerPage);
+		bufMgr->allocPage(file, rootPageNum, rootPage);
+
+		// set the index meta information
+		auto *indexMetaInfo = (IndexMetaInfo *)headerPage;
+		// TODO: what if the name is more than 20 characters?
+		indexName.copy(indexMetaInfo->relationName, 20);
+		indexMetaInfo->attrByteOffset = attrByteOffset;
+		indexMetaInfo->attrType = attributeType;
+		indexMetaInfo->rootPageNo = rootPageNum;
+
+		// TODO: figure out what Piazza @466 means
+
+		// unpin correspondingly
+		bufMgr->unPinPage(file, headerPageNum, true);
+		bufMgr->unPinPage(file, rootPageNum, true);
+
+		// TODO: insertion happens here
+	}
+	else
+	{
+		// TODO: otherwise, open the existing index file
+		file = new BlobFile(indexName, false);
+	}
 }
 
 
@@ -42,6 +84,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex()
 {
+	delete file;
 }
 
 // -----------------------------------------------------------------------------
