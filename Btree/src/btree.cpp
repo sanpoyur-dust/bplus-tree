@@ -36,6 +36,10 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		, attrByteOffset(attrByteOffset)
 		, leafOccupancy(INTARRAYLEAFSIZE)
 		, nodeOccupancy(INTARRAYNONLEAFSIZE)
+		, scanExecuting(false)
+		, nextEntry(-1)
+		, currentPageNum(Page::INVALID_NUMBER)
+		, currentPageData(nullptr)
 {
 	// only supports badgerdb::Integer as attributeType!
 
@@ -204,7 +208,20 @@ void BTreeIndex::scanNext(RecordId& outRid)
 //
 void BTreeIndex::endScan() 
 {
+	// throw an exception if no scan has been initialized.
+	if (!scanExecuting)
+	{
+		throw ScanNotInitializedException();
+	}
 
+	// unpin without modification
+	bufMgr->unPinPage(file, currentPageNum, false);
+
+	// reset correspondingly
+	scanExecuting = false;
+	nextEntry = -1;
+	currentPageNum = Page::INVALID_NUMBER;
+	currentPageData = nullptr;
 }
 
 // -----------------------------------------------------------------------------
@@ -262,8 +279,15 @@ bool BTreeIndex::findFirstEntry(Page *curPage, int prvLevel)
 		// set this page as the next page to find
 		bufMgr->readPage(file, curNodePtr->pageNoArray[i], nxtPage);
 		bool found = findFirstEntry(nxtPage, curNodePtr->level);
-		bufMgr->unPinPage(file, curNodePtr->pageNoArray[i], false);
-		if (found) return true;
+		if (found)
+		{
+			// if found, unpin only if the page is not a leaf
+			if (curNodePtr->level == 0)
+			{
+				bufMgr->unPinPage(file, curNodePtr->pageNoArray[i], false);
+			}
+			return true;
+		}
 	}
 
 	return false;
