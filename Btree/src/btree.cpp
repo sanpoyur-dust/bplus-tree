@@ -37,6 +37,8 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		, leafOccupancy(INTARRAYLEAFSIZE)
 		, nodeOccupancy(INTARRAYNONLEAFSIZE)
 {
+	// only supports badgerdb::Integer as attributeType!
+
 	std::ostringstream idxStr;
 	idxStr << relationName << '.' << attrByteOffset;
 	std::string indexName = idxStr.str();  // index file name
@@ -45,35 +47,54 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 	Page *headerPage;  // header page
 	Page *rootPage;    // root page
 
-	if (!File::exists(indexName))
+	if (!File::exists(outIndexName))
 	{
 		// create a new index file if it doesn't exist
-		file = new BlobFile(indexName, true);
+		file = new BlobFile(outIndexName, true);
 
 		// allocate the header page and root page
 		bufMgr->allocPage(file, headerPageNum, headerPage);
 		bufMgr->allocPage(file, rootPageNum, rootPage);
 
 		// set the index meta information
-		auto *indexMetaInfo = (IndexMetaInfo *)headerPage;
+		auto *indexMetaInfoPtr = (IndexMetaInfo *)headerPage;
 		// TODO: what if the name is more than 20 characters?
-		indexName.copy(indexMetaInfo->relationName, 20);
-		indexMetaInfo->attrByteOffset = attrByteOffset;
-		indexMetaInfo->attrType = attributeType;
-		indexMetaInfo->rootPageNo = rootPageNum;
+		outIndexName.copy(indexMetaInfoPtr->relationName, 20);
+		indexMetaInfoPtr->attrByteOffset = attrByteOffset;
+		indexMetaInfoPtr->attrType = attributeType;
+		indexMetaInfoPtr->rootPageNo = rootPageNum;
 
 		// TODO: figure out what Piazza @466 means
 
-		// unpin correspondingly
+		// unpin with modification
 		bufMgr->unPinPage(file, headerPageNum, true);
 		bufMgr->unPinPage(file, rootPageNum, true);
 
 		// TODO: insertion happens here
+		
 	}
 	else
 	{
-		// TODO: otherwise, open the existing index file
-		file = new BlobFile(indexName, false);
+		// otherwise, open the existing index file
+		file = new BlobFile(outIndexName, false);
+
+		// retrieve the header page
+		headerPageNum = file->getFirstPageNo();
+		bufMgr->readPage(file, headerPageNum, headerPage);
+		auto *indexMetaInfoPtr = (IndexMetaInfo *)headerPage;
+
+		// throw an exception if the information doesn't match
+		if (attributeType != indexMetaInfoPtr->attrType
+				|| attrByteOffset != indexMetaInfoPtr->attrByteOffset
+				|| outIndexName.compare(indexMetaInfoPtr->relationName) != 0) {
+			throw BadIndexInfoException(outIndexName);
+		}
+
+		// get the root page number
+		rootPageNum = indexMetaInfoPtr->rootPageNo;
+
+		// unpin without modification
+		bufMgr->unPinPage(file, headerPageNum, false);
 	}
 }
 
@@ -84,7 +105,16 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex()
 {
+	// end scanning
+  if (scanExecuting)
+	{
+		endScan();
+	}
+
+	// flush the file before the deletion
+	bufMgr->flushFile(file);
 	delete file;
+	file = nullptr;
 }
 
 // -----------------------------------------------------------------------------
