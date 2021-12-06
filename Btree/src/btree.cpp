@@ -64,14 +64,20 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		indexMetaInfoPtr->attrType = attributeType;
 		indexMetaInfoPtr->rootPageNo = rootPageNum;
 
-		// TODO: figure out what Piazza @466 means
+		// set the root node information
+		auto *rootNodeInt = (NonLeafNodeInt *)rootPage;
+		rootNodeInt->level = 1;
+		std::fill_n(rootNodeInt->keyArray, nodeOccupancy, 0);
+		std::fill_n(rootNodeInt->pageNoArray, nodeOccupancy + 1, (PageId)Page::INVALID_NUMBER);
 
 		// unpin with modification
 		bufMgr->unPinPage(file, headerPageNum, true);
 		bufMgr->unPinPage(file, rootPageNum, true);
 
 		// TODO: insertion happens here
-		
+
+		// flush the file
+		bufMgr->flushFile(file);
 	}
 	else
 	{
@@ -86,7 +92,11 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		// throw an exception if the information doesn't match
 		if (attributeType != indexMetaInfoPtr->attrType
 				|| attrByteOffset != indexMetaInfoPtr->attrByteOffset
-				|| outIndexName.compare(indexMetaInfoPtr->relationName) != 0) {
+				|| outIndexName.compare(indexMetaInfoPtr->relationName) != 0)
+		{
+			// unpin without modification
+			bufMgr->unPinPage(file, headerPageNum, false);
+			
 			throw BadIndexInfoException(outIndexName);
 		}
 
@@ -105,7 +115,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex()
 {
-	// end scanning
+	// end the last scanning
   if (scanExecuting)
 	{
 		endScan();
@@ -113,6 +123,7 @@ BTreeIndex::~BTreeIndex()
 
 	// flush the file before the deletion
 	bufMgr->flushFile(file);
+	
 	delete file;
 	file = nullptr;
 }
@@ -135,7 +146,49 @@ void BTreeIndex::startScan(const void* lowValParm,
 				   const void* highValParm,
 				   const Operator highOpParm)
 {
+	// throw an exception if the opcodes are bad
+	if ((lowOpParm != GT && lowOpParm != GTE)
+	    || (highOpParm != LT && highOpParm != LTE))
+	{
+		throw BadOpcodesException();
+	}
 
+	// throw an exception if the search range is bad
+	if (*(int *)lowValParm > *(int *)highValParm)
+	{
+		throw BadScanrangeException();
+	}
+
+	// end the last scan
+	if (scanExecuting)
+	{
+		endScan();
+	}
+
+	// set the scanning information
+	scanExecuting = true;
+	lowValInt = *(int *)lowValParm;
+	lowOp = lowOpParm;
+	highValInt = *(int *)highValParm;
+	highOp = highOpParm;
+	
+	// read the root page
+	Page *rootPage;
+	bufMgr->readPage(file, rootPageNum, rootPage);
+
+	// TODO: find the next entry
+	bool found = false;
+
+	// throw an exception if no such key is found
+	if (!found) {
+		// unpin without modification
+		bufMgr->unPinPage(file, rootPageNum, false);
+
+		throw NoSuchKeyFoundException();
+	}
+
+	// unpin without modification
+	bufMgr->unPinPage(file, rootPageNum, false);
 }
 
 // -----------------------------------------------------------------------------

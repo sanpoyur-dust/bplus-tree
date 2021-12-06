@@ -152,7 +152,8 @@ void test0()
 
 	std::cout << "Create a B+ Tree index on the integer field" << std::endl;
   BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-	
+
+	intScan(&index, -2, GT, 2, LT);
 }
 
 void test1()
