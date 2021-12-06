@@ -178,7 +178,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 	// find the first entry
 	// throw an exception if no such key is found
-	if (!findFirstEntry(rootPage)) {
+	if (!findFirstEntry(rootPage, 0)) {
 		// unpin without modification
 		bufMgr->unPinPage(file, rootPageNum, false);
 
@@ -211,8 +211,39 @@ void BTreeIndex::endScan()
 // BTreeIndex::findFirstEntry
 // -----------------------------------------------------------------------------
 //
-bool BTreeIndex::findFirstEntry(Page *curPage)
+bool BTreeIndex::findFirstEntry(Page *curPage, int prvLevel)
 {
+	// check if the current page is a leaf
+	if (prvLevel == 1)
+	{
+		auto *curLeafPtr = (LeafNodeInt *)curPage;  // current leaf pointer
+		for (int i = 0; 
+				i < leafOccupancy && curLeafPtr->ridArray[i].page_number != Page::INVALID_NUMBER;
+				++i)
+		{
+			// skip if the key is too small
+			if (!compareOp(curLeafPtr->keyArray[i], lowValInt, lowOp))
+			{
+				continue;
+			}
+
+			// not found if the key is too large
+			// since it cannot be found later
+			if (!compareOp(curLeafPtr->keyArray[i], highValInt, highOp))
+			{
+				return false;
+			}
+
+			// found if the key is within the range
+			nextEntry = i;
+			currentPageNum = curPage->page_number();
+			currentPageData = curPage;
+			return true;
+		}
+
+		return false;
+	}
+
 	auto *curNodePtr = (NonLeafNodeInt *)curPage;  // current node pointer
 	Page *nxtPage;  // next page
 
@@ -229,15 +260,16 @@ bool BTreeIndex::findFirstEntry(Page *curPage)
 		}
 
 		// the keys of the entries are less than or equal to the right key
-		// skip if the low value cannot be in this children page
+		// not found if the low value cannot be in this children page
+		// since it cannot be found later
 		if (i != nodeOccupancy && !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
 		{
-			continue;
+			return false;
 		}
 
 		// set this page as the next page to find
 		bufMgr->readPage(file, curNodePtr->pageNoArray[0], nxtPage);
-		bool found = findFirstEntry(nxtPage);
+		bool found = findFirstEntry(nxtPage, curNodePtr->level);
 		bufMgr->unPinPage(file, nxtPage->page_number(), false);
 		if (found) return true;
 	}
