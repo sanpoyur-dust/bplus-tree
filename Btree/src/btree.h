@@ -18,7 +18,7 @@
 #include "buffer.h"
 
 // TODO: remove after testing!!!
-// #define private public
+#define private public
 
 namespace badgerdb
 {
@@ -316,7 +316,7 @@ class BTreeIndex {
   /**
    * TODO: documentation
    */
-	bool findFirstEntry(Page *curPage);
+	bool findFirstEntry(Page *curPage, int prvLevel);
 
  public:
 

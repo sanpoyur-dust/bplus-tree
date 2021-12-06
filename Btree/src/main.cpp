@@ -8,7 +8,7 @@
 #include <vector>
 #include "btree.h"
 // TODO: remove after testing!!!
-// #undef private
+#undef private
 #include "page.h"
 #include "filescan.h"
 #include "page_iterator.h"
@@ -155,7 +155,89 @@ void test0()
 		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
 		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
 
-		intScan(&index, -2, GT, 2, LT);
+		File *indexFile = index.file;
+
+		Page rootPage = indexFile->readPage(index.rootPageNum);
+		auto *rootIntPtr = (NonLeafNodeInt *)&rootPage;
+
+		rootIntPtr->keyArray[0] = -5;
+		rootIntPtr->keyArray[1] = -3;
+		rootIntPtr->keyArray[2] = -2;
+		rootIntPtr->keyArray[3] = 0;
+		rootIntPtr->keyArray[4] = 5;
+
+		PageId pageNum[6];
+		for (int i = 0; i < 6; ++i)
+		{
+			indexFile->allocatePage(pageNum[i]);
+			rootIntPtr->pageNoArray[i] = pageNum[i];
+		}
+
+		Page childPage[6];
+		for (int i = 0; i < 6; ++i)
+		{
+			childPage[i] = indexFile->readPage(pageNum[i]);
+		}
+		
+		LeafNodeInt *leafIntPtr[6];
+		for (int i = 0; i < 6; ++i)
+		{
+			leafIntPtr[i] = (LeafNodeInt *)&childPage[i];
+		}
+
+		leafIntPtr[0]->keyArray[0] = -6;
+		leafIntPtr[0]->ridArray[0].page_number = pageNum[0];
+
+		leafIntPtr[1]->keyArray[0] = -3;
+		leafIntPtr[1]->ridArray[0].page_number = pageNum[1];
+		
+		leafIntPtr[2]->keyArray[0] = -3;
+		leafIntPtr[2]->ridArray[0].page_number = pageNum[2];
+		leafIntPtr[2]->keyArray[1] = -2;
+		leafIntPtr[2]->ridArray[1].page_number = pageNum[2];
+
+		leafIntPtr[3]->keyArray[0] = -2;
+		leafIntPtr[3]->ridArray[0].page_number = pageNum[3];
+		leafIntPtr[3]->keyArray[1] = -1;
+		leafIntPtr[3]->ridArray[1].page_number = pageNum[3];
+
+		leafIntPtr[4]->keyArray[0] = 0;
+		leafIntPtr[4]->ridArray[0].page_number = pageNum[4];
+
+		leafIntPtr[5]->keyArray[0] = 5;
+		leafIntPtr[5]->ridArray[0].page_number = pageNum[5];
+
+		indexFile->writePage(index.rootPageNum, rootPage);
+		for (int i = 0; i < 6; ++i)
+		{
+			indexFile->writePage(pageNum[i], childPage[i]);
+		}
+		
+		int lowVal = -2;
+		int highVal = 2;
+		try
+		{
+			index.startScan(&lowVal, GT, &highVal, LT);
+		}
+		catch (const NoSuchKeyFoundException &e)
+		{
+			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		}
+
+		checkPassFail(index.nextEntry, 1)
+		checkPassFail(index.currentPageNum, pageNum[3])
+
+		try
+		{
+			index.startScan(&lowVal, GTE, &highVal, LTE);
+		}
+		catch (const NoSuchKeyFoundException &e)
+		{
+			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		}
+		
+		checkPassFail(index.nextEntry, 1)
+		checkPassFail(index.currentPageNum, pageNum[2])
 	}
 	
 	try

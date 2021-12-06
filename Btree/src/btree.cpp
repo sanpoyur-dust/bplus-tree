@@ -236,7 +236,7 @@ bool BTreeIndex::findFirstEntry(Page *curPage, int prvLevel)
 
 			// found if the key is within the range
 			nextEntry = i;
-			currentPageNum = curPage->page_number();
+			currentPageNum = curLeafPtr->ridArray[i].page_number;
 			currentPageData = curPage;
 			return true;
 		}
@@ -252,25 +252,17 @@ bool BTreeIndex::findFirstEntry(Page *curPage, int prvLevel)
 			i < nodeOccupancy + 1 && curNodePtr->pageNoArray[i] != Page::INVALID_NUMBER;
 			++i)
 	{
-		// the keys of the entries are greater than or equal to the left key
+		// the keys of the entries are less than or equal to the right key
 		// skip if the low value cannot be in this children page
-		if (i != 0 && !compareOp(lowValInt, curNodePtr->keyArray[i - 1], lowOp))
+		if (i != nodeOccupancy && !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
 		{
 			continue;
 		}
 
-		// the keys of the entries are less than or equal to the right key
-		// not found if the low value cannot be in this children page
-		// since it cannot be found later
-		if (i != nodeOccupancy && !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
-		{
-			return false;
-		}
-
 		// set this page as the next page to find
-		bufMgr->readPage(file, curNodePtr->pageNoArray[0], nxtPage);
+		bufMgr->readPage(file, curNodePtr->pageNoArray[i], nxtPage);
 		bool found = findFirstEntry(nxtPage, curNodePtr->level);
-		bufMgr->unPinPage(file, nxtPage->page_number(), false);
+		bufMgr->unPinPage(file, curNodePtr->pageNoArray[i], false);
 		if (found) return true;
 	}
 
