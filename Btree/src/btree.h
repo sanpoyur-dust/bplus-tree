@@ -17,6 +17,9 @@
 #include "file.h"
 #include "buffer.h"
 
+// TODO: remove after testing!!!
+// #define private public
+
 namespace badgerdb
 {
 
@@ -41,6 +44,25 @@ enum Operator
 	GT		/* Greater Than */
 };
 
+/**
+ * TODO: documentation
+ */
+inline bool compareOp(int x, int y, Operator op)
+{
+  switch (op)
+  {
+  case LT:
+    return x < y;
+  case LTE:
+    return x <= y;
+  case GTE:
+    return x >= y;
+  case GT:
+    return x > y;
+  default:
+    return false;
+  }
+}
 
 /**
  * @brief Number of key slots in B+Tree leaf for INTEGER key.
@@ -291,7 +313,11 @@ class BTreeIndex {
    */
 	Operator	highOp;
 
-	
+  /**
+   * TODO: documentation
+   */
+	bool findFirstEntry(Page *curPage);
+
  public:
 
   /**

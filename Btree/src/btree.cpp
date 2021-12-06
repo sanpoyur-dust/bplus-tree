@@ -65,10 +65,10 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		indexMetaInfoPtr->rootPageNo = rootPageNum;
 
 		// set the root node information
-		auto *rootNodeInt = (NonLeafNodeInt *)rootPage;
-		rootNodeInt->level = 1;
-		std::fill_n(rootNodeInt->keyArray, nodeOccupancy, 0);
-		std::fill_n(rootNodeInt->pageNoArray, nodeOccupancy + 1, (PageId)Page::INVALID_NUMBER);
+		auto *rootIntPtr = (NonLeafNodeInt *)rootPage;
+		rootIntPtr->level = 1;
+		std::fill_n(rootIntPtr->keyArray, nodeOccupancy, 0);
+		std::fill_n(rootIntPtr->pageNoArray, nodeOccupancy + 1, (PageId)Page::INVALID_NUMBER);
 
 		// unpin with modification
 		bufMgr->unPinPage(file, headerPageNum, true);
@@ -123,7 +123,7 @@ BTreeIndex::~BTreeIndex()
 
 	// flush the file before the deletion
 	bufMgr->flushFile(file);
-	
+
 	delete file;
 	file = nullptr;
 }
@@ -176,11 +176,9 @@ void BTreeIndex::startScan(const void* lowValParm,
 	Page *rootPage;
 	bufMgr->readPage(file, rootPageNum, rootPage);
 
-	// TODO: find the next entry
-	bool found = false;
-
+	// find the first entry
 	// throw an exception if no such key is found
-	if (!found) {
+	if (!findFirstEntry(rootPage)) {
 		// unpin without modification
 		bufMgr->unPinPage(file, rootPageNum, false);
 
@@ -207,6 +205,44 @@ void BTreeIndex::scanNext(RecordId& outRid)
 void BTreeIndex::endScan() 
 {
 
+}
+
+// -----------------------------------------------------------------------------
+// BTreeIndex::findFirstEntry
+// -----------------------------------------------------------------------------
+//
+bool BTreeIndex::findFirstEntry(Page *curPage)
+{
+	auto *curNodePtr = (NonLeafNodeInt *)curPage;  // current node pointer
+	Page *nxtPage;  // next page
+
+	// find in every valid children page
+	for (int i = 0; 
+			i < nodeOccupancy + 1 && curNodePtr->pageNoArray[i] != Page::INVALID_NUMBER;
+			++i)
+	{
+		// the keys of the entries are greater than or equal to the left key
+		// skip if the low value cannot be in this children page
+		if (i != 0 && !compareOp(lowValInt, curNodePtr->keyArray[i - 1], lowOp))
+		{
+			continue;
+		}
+
+		// the keys of the entries are less than or equal to the right key
+		// skip if the low value cannot be in this children page
+		if (i != nodeOccupancy && !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
+		{
+			continue;
+		}
+
+		// set this page as the next page to find
+		bufMgr->readPage(file, curNodePtr->pageNoArray[0], nxtPage);
+		bool found = findFirstEntry(nxtPage);
+		bufMgr->unPinPage(file, nxtPage->page_number(), false);
+		if (found) return true;
+	}
+
+	return false;
 }
 
 }

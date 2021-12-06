@@ -7,6 +7,8 @@
 
 #include <vector>
 #include "btree.h"
+// TODO: remove after testing!!!
+// #undef private
 #include "page.h"
 #include "filescan.h"
 #include "page_iterator.h"
@@ -149,11 +151,19 @@ int main(int argc, char **argv)
 void test0()
 {
 	// used for incremental development...
+	{
+		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
+		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
 
-	std::cout << "Create a B+ Tree index on the integer field" << std::endl;
-  BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-
-	intScan(&index, -2, GT, 2, LT);
+		intScan(&index, -2, GT, 2, LT);
+	}
+	
+	try
+	{
+		File::remove(intIndexName);
+	}
+	catch (const FileNotFoundException &e)
+	{}
 }
 
 void test1()
