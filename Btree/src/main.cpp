@@ -603,7 +603,7 @@ int myIntScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Opera
 {
   RecordId scanRid;
 
-  std::cout << "Scan for ";
+  std::cout << "\nScan for ";
   if( lowOp == GT ) { std::cout << "("; } else { std::cout << "["; }
   std::cout << lowVal << "," << highVal;
   if( highOp == LT ) { std::cout << ")"; } else { std::cout << "]"; }
@@ -881,7 +881,11 @@ void myTest1()
 			{190, 240, 260}
 		);
 
-		myIntScan(&index, 82, GT, 122, LT);
+		checkPassFail(myIntScan(&index, 82, GT, 122, LT), 3)
+		checkPassFail(myIntScan(&index, 70, GTE, 120, LT), 4)
+		checkPassFail(myIntScan(&index, 70, GT, 120, LTE), 4)
+		checkPassFail(myIntScan(&index, 10, GT, 260, LTE), 13)
+		checkPassFail(myIntScan(&index, 9, GT, 400, LTE), 14)
 	}
 
 	try

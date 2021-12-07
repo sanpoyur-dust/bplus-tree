@@ -205,22 +205,23 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	auto *leafIntPtr = (LeafNodeInt *)currentPageData;
 	outRid = leafIntPtr->ridArray[nextEntry];
 
-	// update for the next scan
-	// get the page number of the right sibling
-	PageId rightSibPageNum = leafIntPtr->rightSibPageNo;
+	bool isEnd = false;  // true if need to change page but reach the end
 
-	if (rightSibPageNum == currentPageNum)
+	// update for the next scan
+	++nextEntry;
+	if (nextEntry >= leafOccupancy || leafIntPtr->ridArray[nextEntry].page_number == Page::INVALID_NUMBER)
 	{
-		// no need to change the page
-		++nextEntry;
-	}
-	else
-	{
+		// need to change the page
+		// get the page number of the right sibling
+		PageId rightSibPageNum = leafIntPtr->rightSibPageNo;
+
 		// unpin without modification
 		bufMgr->unPinPage(file, currentPageNum, false);
 
+		isEnd = rightSibPageNum == Page::INVALID_NUMBER;
+
 		// change the page correspondingly
-		if (rightSibPageNum != Page::INVALID_NUMBER)
+		if (!isEnd)
 		{
 			currentPageNum = rightSibPageNum;
 			bufMgr->readPage(file, currentPageNum, currentPageData);
@@ -231,11 +232,10 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	}
 
 	// see if the next record does not satisfy the scan criteria
-	if (rightSibPageNum == Page::INVALID_NUMBER
-			|| !compareOp(leafIntPtr->keyArray[nextEntry], highValInt, highOp))
+	if (isEnd || !compareOp(leafIntPtr->keyArray[nextEntry], highValInt, highOp))
 	{
 		// unpin without modification
-		if (rightSibPageNum != Page::INVALID_NUMBER)
+		if (!isEnd)
 		{
 			bufMgr->unPinPage(file, currentPageNum, false);
 		}
