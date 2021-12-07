@@ -802,7 +802,7 @@ void myTest0()
 	{}
 }
 
-// a tree with height 4
+// a tree with height 3
 void myTest1()
 {
 	{
