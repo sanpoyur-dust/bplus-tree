@@ -78,6 +78,7 @@ void errorTests();
 void deleteRelation();
 
 // TODO: remove after testing!!!
+int myIntScan(BTreeIndex *index, int lowVal, Operator lowOp, int highVal, Operator highOp);
 void setNodeInfo(
 		File *indexFile,
 		PageId pageNum,
@@ -87,7 +88,7 @@ void setNodeInfo(
 void setLeafInfo(
 		File *indexFile,
 		PageId pageNum,
-		PageId nextPageNum,
+		PageId rightSibPageNum,
 		const std::vector<int> &keys);
 void myTest0();
 void myTest1();
@@ -598,6 +599,63 @@ void deleteRelation()
 }
 
 // TODO: remove after testing!!!
+int myIntScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Operator highOp)
+{
+  RecordId scanRid;
+
+  std::cout << "Scan for ";
+  if( lowOp == GT ) { std::cout << "("; } else { std::cout << "["; }
+  std::cout << lowVal << "," << highVal;
+  if( highOp == LT ) { std::cout << ")"; } else { std::cout << "]"; }
+  std::cout << std::endl;
+
+  int numResults = 0;
+	
+	try
+	{
+  	index->startScan(&lowVal, lowOp, &highVal, highOp);
+	}
+	catch(const NoSuchKeyFoundException &e)
+	{
+    std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		return 0;
+	}
+
+	while(1)
+	{
+		try
+		{
+			PageId tmpPageNum = index->currentPageNum;
+			int tmpEntry = index->nextEntry;
+			index->scanNext(scanRid);
+
+			if( numResults < 5 )
+			{
+				std::cout << "index:" << tmpPageNum << "," << tmpEntry <<std::endl;
+			}
+			else if( numResults == 5 )
+			{
+				std::cout << "..." << std::endl;
+			}
+		}
+		catch(const IndexScanCompletedException &e)
+		{
+			break;
+		}
+
+		numResults++;
+	}
+
+  if( numResults >= 5 )
+  {
+    std::cout << "Number of results: " << numResults << std::endl;
+  }
+  index->endScan();
+  std::cout << std::endl;
+
+	return numResults;
+}
+
 void setNodeInfo(
 		File *indexFile,
 		PageId pageNum,
@@ -631,7 +689,7 @@ void setNodeInfo(
 void setLeafInfo(
 		File *indexFile,
 		PageId pageNum,
-		PageId nextPageNum,
+		PageId rightSibPageNum,
 		const std::vector<int> &keys)
 {
   Page page = indexFile->readPage(pageNum);
@@ -642,15 +700,14 @@ void setLeafInfo(
 	for (size_t i = 0; i < keySize; ++i)
 	{
 		leafIntPtr->keyArray[i] = keys[i];
-		leafIntPtr->ridArray[i].page_number = pageNum;
+		leafIntPtr->ridArray[i].page_number = 1;  // just a placeholder
 	}
 
-	leafIntPtr->rightSibPageNo = nextPageNum;
+	leafIntPtr->rightSibPageNo = rightSibPageNum;
 
 	indexFile->writePage(pageNum, page);
 }
 
-// TODO: remove after testing!!!
 // a tree with height 2
 void myTest0()
 {
@@ -745,7 +802,6 @@ void myTest0()
 	{}
 }
 
-// TODO: remove after testing!!!
 // a tree with height 4
 void myTest1()
 {
@@ -824,20 +880,8 @@ void myTest1()
 			Page::INVALID_NUMBER,
 			{190, 240, 260}
 		);
-		
-		int lowVal = 82;
-		int highVal = 122;
-		try
-		{
-			index.startScan(&lowVal, GT, &highVal, LT);
-		}
-		catch (const NoSuchKeyFoundException &e)
-		{
-			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
-		}
 
-		checkPassFail(index.nextEntry, 2)
-		checkPassFail(index.currentPageNum, pageNums1[2])
+		myIntScan(&index, 82, GT, 122, LT);
 	}
 
 	try

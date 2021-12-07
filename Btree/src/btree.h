@@ -316,7 +316,7 @@ class BTreeIndex {
   /**
    * TODO: documentation
    */
-	bool findFirstEntry(Page *curPage, int prvLevel);
+	bool findFirstEntry(PageId curPageNum, int prvLevel);
 
  public:
 
