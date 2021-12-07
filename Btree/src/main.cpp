@@ -71,12 +71,26 @@ void createRelationRandom();
 void intTests();
 int intScan(BTreeIndex *index, int lowVal, Operator lowOp, int highVal, Operator highOp);
 void indexTests();
-void test0();
 void test1();
 void test2();
 void test3();
 void errorTests();
 void deleteRelation();
+
+// TODO: remove after testing!!!
+void setNodeInfo(
+		File *indexFile,
+		PageId pageNum,
+		std::vector<int> &keys,
+		const std::vector<PageId> &nodePageNums,
+		int level);
+void setLeafInfo(
+		File *indexFile,
+		PageId pageNum,
+		PageId nextPageNum,
+		const std::vector<int> &keys);
+void myTest0();
+void myTest1();
 
 int main(int argc, char **argv)
 {
@@ -137,7 +151,9 @@ int main(int argc, char **argv)
 
 	File::remove(relationName);
 
-	test0();
+	myTest0();
+	myTest1();
+
 	// test1();
 	// test2();
 	// test3();
@@ -146,106 +162,6 @@ int main(int argc, char **argv)
 	delete bufMgr;
 
   return 1;
-}
-
-void test0()
-{
-	// used for incremental development...
-	{
-		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
-		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-
-		File *indexFile = index.file;
-
-		Page rootPage = indexFile->readPage(index.rootPageNum);
-		auto *rootIntPtr = (NonLeafNodeInt *)&rootPage;
-
-		rootIntPtr->keyArray[0] = -5;
-		rootIntPtr->keyArray[1] = -3;
-		rootIntPtr->keyArray[2] = -2;
-		rootIntPtr->keyArray[3] = 0;
-		rootIntPtr->keyArray[4] = 5;
-
-		PageId pageNum[6];
-		for (int i = 0; i < 6; ++i)
-		{
-			indexFile->allocatePage(pageNum[i]);
-			rootIntPtr->pageNoArray[i] = pageNum[i];
-		}
-
-		Page childPage[6];
-		for (int i = 0; i < 6; ++i)
-		{
-			childPage[i] = indexFile->readPage(pageNum[i]);
-		}
-		
-		LeafNodeInt *leafIntPtr[6];
-		for (int i = 0; i < 6; ++i)
-		{
-			leafIntPtr[i] = (LeafNodeInt *)&childPage[i];
-		}
-
-		leafIntPtr[0]->keyArray[0] = -6;
-		leafIntPtr[0]->ridArray[0].page_number = pageNum[0];
-
-		leafIntPtr[1]->keyArray[0] = -3;
-		leafIntPtr[1]->ridArray[0].page_number = pageNum[1];
-		
-		leafIntPtr[2]->keyArray[0] = -3;
-		leafIntPtr[2]->ridArray[0].page_number = pageNum[2];
-		leafIntPtr[2]->keyArray[1] = -2;
-		leafIntPtr[2]->ridArray[1].page_number = pageNum[2];
-
-		leafIntPtr[3]->keyArray[0] = -2;
-		leafIntPtr[3]->ridArray[0].page_number = pageNum[3];
-		leafIntPtr[3]->keyArray[1] = -1;
-		leafIntPtr[3]->ridArray[1].page_number = pageNum[3];
-
-		leafIntPtr[4]->keyArray[0] = 0;
-		leafIntPtr[4]->ridArray[0].page_number = pageNum[4];
-
-		leafIntPtr[5]->keyArray[0] = 5;
-		leafIntPtr[5]->ridArray[0].page_number = pageNum[5];
-
-		indexFile->writePage(index.rootPageNum, rootPage);
-		for (int i = 0; i < 6; ++i)
-		{
-			indexFile->writePage(pageNum[i], childPage[i]);
-		}
-		
-		int lowVal = -2;
-		int highVal = 2;
-		try
-		{
-			index.startScan(&lowVal, GT, &highVal, LT);
-		}
-		catch (const NoSuchKeyFoundException &e)
-		{
-			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
-		}
-
-		checkPassFail(index.nextEntry, 1)
-		checkPassFail(index.currentPageNum, pageNum[3])
-
-		try
-		{
-			index.startScan(&lowVal, GTE, &highVal, LTE);
-		}
-		catch (const NoSuchKeyFoundException &e)
-		{
-			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
-		}
-		
-		checkPassFail(index.nextEntry, 1)
-		checkPassFail(index.currentPageNum, pageNum[2])
-	}
-	
-	try
-	{
-		File::remove(intIndexName);
-	}
-	catch (const FileNotFoundException &e)
-	{}
 }
 
 void test1()
@@ -679,4 +595,255 @@ void deleteRelation()
 	catch(const FileNotFoundException &e)
 	{
 	}
+}
+
+// TODO: remove after testing!!!
+void setNodeInfo(
+		File *indexFile,
+		PageId pageNum,
+		const std::vector<int> &keys,
+		std::vector<PageId> &nodePageNums,
+		int level)
+{
+  Page page = indexFile->readPage(pageNum);
+	auto *nodeIntPtr = (NonLeafNodeInt *)&page;
+
+	nodeIntPtr->level = level;
+
+	size_t keySize = keys.size();
+	
+	for (size_t i = 0; i < keySize; ++i)
+	{
+		nodeIntPtr->keyArray[i] = keys[i];
+	}
+
+	nodePageNums.resize(keySize + 1);
+
+	for (size_t i = 0; i < keySize + 1; ++i)
+	{
+		indexFile->allocatePage(nodePageNums[i]);
+		nodeIntPtr->pageNoArray[i] = nodePageNums[i];
+	}
+
+	indexFile->writePage(pageNum, page);
+}
+
+void setLeafInfo(
+		File *indexFile,
+		PageId pageNum,
+		PageId nextPageNum,
+		const std::vector<int> &keys)
+{
+  Page page = indexFile->readPage(pageNum);
+	auto *leafIntPtr = (LeafNodeInt *)&page;
+
+	size_t keySize = keys.size();
+
+	for (size_t i = 0; i < keySize; ++i)
+	{
+		leafIntPtr->keyArray[i] = keys[i];
+		leafIntPtr->ridArray[i].page_number = pageNum;
+	}
+
+	leafIntPtr->rightSibPageNo = nextPageNum;
+
+	indexFile->writePage(pageNum, page);
+}
+
+// TODO: remove after testing!!!
+// a tree with height 2
+void myTest0()
+{
+	{
+		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
+		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+
+		std::vector<PageId> rootPageNums;
+
+		setNodeInfo(
+			index.file,
+			index.rootPageNum,
+			{-5, -3, -2, 0, 5},
+			rootPageNums,
+			1
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[0],
+			rootPageNums[1],
+			{-6}
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[1],
+			rootPageNums[2],
+			{-3}
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[2],
+			rootPageNums[3],
+			{-3, -2}
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[3],
+			rootPageNums[4],
+			{-2, -1}
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[4],
+			rootPageNums[5],
+			{0}
+		);
+
+		setLeafInfo(
+			index.file,
+			rootPageNums[5],
+			Page::INVALID_NUMBER,
+			{5}
+		);
+		
+		int lowVal = -2;
+		int highVal = 2;
+		try
+		{
+			index.startScan(&lowVal, GT, &highVal, LT);
+		}
+		catch (const NoSuchKeyFoundException &e)
+		{
+			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		}
+
+		checkPassFail(index.nextEntry, 1)
+		checkPassFail(index.currentPageNum, rootPageNums[3])
+
+		try
+		{
+			index.startScan(&lowVal, GTE, &highVal, LTE);
+		}
+		catch (const NoSuchKeyFoundException &e)
+		{
+			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		}
+		
+		checkPassFail(index.nextEntry, 1)
+		checkPassFail(index.currentPageNum, rootPageNums[2])
+	}
+	
+	try
+	{
+		File::remove(intIndexName);
+	}
+	catch (const FileNotFoundException &e)
+	{}
+}
+
+// TODO: remove after testing!!!
+// a tree with height 4
+void myTest1()
+{
+	{
+		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
+		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+
+		std::vector<PageId> pageNums0;
+
+		setNodeInfo(
+			index.file,
+			index.rootPageNum,
+			{100},
+			pageNums0,
+			0
+		);
+
+		std::vector<PageId> pageNums1;
+
+		setNodeInfo(
+			index.file,
+			pageNums0[0],
+			{35, 65},
+			pageNums1,
+			1
+		);
+
+		std::vector<PageId> pageNums2;
+
+		setNodeInfo(
+			index.file,
+			pageNums0[1],
+			{130, 180},
+			pageNums2,
+			1
+		);
+
+		setLeafInfo(
+			index.file,
+			pageNums1[0],
+			pageNums1[1],
+			{10, 20}
+		);
+
+		setLeafInfo(
+			index.file,
+			pageNums1[1],
+			pageNums1[2],
+			{40, 50}
+		);
+
+		setLeafInfo(
+			index.file,
+			pageNums1[2],
+			pageNums2[0],
+			{70, 80, 90}
+		);
+
+		setLeafInfo(
+			index.file,
+			pageNums2[0],
+			pageNums2[1],
+			{110, 120}
+		);
+		
+		setLeafInfo(
+			index.file,
+			pageNums2[1],
+			pageNums2[2],
+			{140, 160}
+		);
+
+		setLeafInfo(
+			index.file,
+			pageNums2[2],
+			Page::INVALID_NUMBER,
+			{190, 240, 260}
+		);
+		
+		int lowVal = 82;
+		int highVal = 122;
+		try
+		{
+			index.startScan(&lowVal, GT, &highVal, LT);
+		}
+		catch (const NoSuchKeyFoundException &e)
+		{
+			std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+		}
+
+		checkPassFail(index.nextEntry, 2)
+		checkPassFail(index.currentPageNum, pageNums1[2])
+	}
+
+	try
+	{
+		File::remove(intIndexName);
+	}
+	catch (const FileNotFoundException &e)
+	{}
 }

@@ -271,7 +271,9 @@ bool BTreeIndex::findFirstEntry(Page *curPage, int prvLevel)
 	{
 		// the keys of the entries are less than or equal to the right key
 		// skip if the low value cannot be in this children page
-		if (i != nodeOccupancy && !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
+		if (i + 1 != nodeOccupancy + 1
+				&& curNodePtr->pageNoArray[i + 1] != Page::INVALID_NUMBER
+				&& !compareOp(curNodePtr->keyArray[i], lowValInt, lowOp))
 		{
 			continue;
 		}
