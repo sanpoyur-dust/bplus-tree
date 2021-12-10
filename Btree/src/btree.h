@@ -322,10 +322,10 @@ class BTreeIndex {
 
   /**
    * TODO: documentation
-   * Find the leftmost entry with a key that lies within the search bound starting from a given leaf.
+   * Find the next entry with a key that lies within the search bound
    * Return whether found or not.
    */
-	bool findScanEntry(PageId curPageNum);
+	bool findScanEntry();
 
  public:
 
