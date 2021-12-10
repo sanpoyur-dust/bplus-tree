@@ -315,8 +315,17 @@ class BTreeIndex {
 
   /**
    * TODO: documentation
+   * Find the leftmost leaf with an upper bound satisfying the given condition with the given value.
+   * Return the page number.
    */
-	bool findFirstEntry(PageId curPageNum, int prvLevel);
+  PageId findLeafPageNum(PageId curPageNum, int val, Operator op);
+
+  /**
+   * TODO: documentation
+   * Find the leftmost entry with a key that lies within the search bound starting from a given leaf.
+   * Return whether found or not.
+   */
+	bool findScanEntry(PageId curPageNum);
 
  public:
 
