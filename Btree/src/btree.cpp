@@ -177,7 +177,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 	highOp = highOpParm;
 	
 	// find the leftmost entry with a key that lies within the search bound
-	currentPageNum = findLeafPageNum(rootPageNum, lowValInt, lowOp);
+	currentPageNum = findLeafPageNum(lowValInt, lowOp);
 	if (currentPageNum != Page::INVALID_NUMBER) {
 		bufMgr->readPage(file, currentPageNum, currentPageData);
 		nextEntry = -1;
@@ -248,9 +248,10 @@ void BTreeIndex::endScan()
 // BTreeIndex::findLeafPageNum
 // -----------------------------------------------------------------------------
 //
-PageId BTreeIndex::findLeafPageNum(PageId curPageNum, int val, Operator op)
+PageId BTreeIndex::findLeafPageNum(int val, Operator op)
 {
-	// read the current page
+	// read the root page
+	PageId curPageNum = rootPageNum;
 	Page *curPage;
 	bufMgr->readPage(file, curPageNum, curPage);
 

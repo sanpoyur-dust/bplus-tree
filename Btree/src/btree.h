@@ -318,7 +318,7 @@ class BTreeIndex {
    * Find the leftmost leaf with an upper bound satisfying the given condition with the given value.
    * Return the page number.
    */
-  PageId findLeafPageNum(PageId curPageNum, int val, Operator op);
+  PageId findLeafPageNum(int val, Operator op);
 
   /**
    * TODO: documentation
