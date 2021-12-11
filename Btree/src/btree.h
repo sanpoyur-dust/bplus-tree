@@ -327,6 +327,17 @@ class BTreeIndex {
    */
 	bool findScanEntry();
 
+  /**
+   * TODO: documentation
+   */
+  template <class T>
+  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, RIDKeyPair<T> &rk, int pos, int m);
+  /**
+   * TODO: documentation
+   */
+  template<class T>
+  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, PageKeyPair<T> &pk, int pos, int m);
+
  public:
 
   /**

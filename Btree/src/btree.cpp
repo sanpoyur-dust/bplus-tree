@@ -78,7 +78,21 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		bufMgr->unPinPage(file, headerPageNum, true);
 		bufMgr->unPinPage(file, rootPageNum, true);
 
-		// TODO: insertion happens here
+		FileScan fscan = FileScan(relationName, bufMgr);
+		try
+		{
+			RecordId scanRid;
+			while(1)
+			{
+				fscan.scanNext(scanRid);
+				std::string recordStr = fscan.getRecord();
+				const char *record = recordStr.c_str();
+				const void *key = record + attrByteOffset;
+				insertEntry(key, scanRid);
+			}
+		}
+		catch(const EndOfFileException &e)
+		{}
 
 		// flush the file
 		bufMgr->flushFile(file);
@@ -138,7 +152,49 @@ BTreeIndex::~BTreeIndex()
 
 void BTreeIndex::insertEntry(const void *key, const RecordId rid) 
 {
+	int val = *(int *)key;
 
+	// find the leaf where the entry should belong
+	PageId leafPageNum = findLeafPageNum(val, GTE);
+	Page *leafPage;
+	bufMgr->readPage(file, leafPageNum, leafPage);
+
+	auto *leafIntPtr = (LeafNodeInt *)leafPage;
+
+	// determine the number of valid entries in the leaf
+	int m = 0;
+	while (m < leafOccupancy
+			&& leafIntPtr->ridArray[m].page_number != Page::INVALID_NUMBER)
+	{
+		++m;
+	}
+
+	// locate an entry with a larger key in the leaf
+	int pos = m;  // the position to insert the entry
+	for (int i = 0; i < m; ++i)
+	{
+		if (leafIntPtr->keyArray[i] > val)
+		{
+			pos = i;
+			break;
+		}
+	}
+
+	// check if there is enough space
+	if (m < leafOccupancy)
+	{
+		RIDKeyPair<int> rk;
+		rk.set(rid, val);
+		insertRIDKeyPair(leafIntPtr, rk, pos, m);
+	}
+	else
+	{
+		std::cout << "TODO: there is no enough space..." << std::endl;
+		throw std::exception();
+	}
+
+	// unpin with modification
+	bufMgr->unPinPage(file, leafPageNum, true);
 }
 
 // -----------------------------------------------------------------------------
@@ -362,6 +418,40 @@ bool BTreeIndex::findScanEntry()
 	nextEntry = -1;
 
 	return false;
+}
+
+// -----------------------------------------------------------------------------
+// BTreeIndex::insertRIDKeyPair
+// -----------------------------------------------------------------------------
+//
+template <class T>
+void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, RIDKeyPair<T> &rk, int pos, int m)
+{
+	for (int i = m - 1; i >= pos; --i)
+	{
+		leafIntPtr->ridArray[i + 1] = leafIntPtr->ridArray[i];
+		leafIntPtr->keyArray[i + 1] = leafIntPtr->keyArray[i];
+	}
+
+	leafIntPtr->ridArray[pos] = rk.rid;
+	leafIntPtr->keyArray[pos] = rk.key;
+}
+
+// -----------------------------------------------------------------------------
+// BTreeIndex::insertPageKeyPair
+// -----------------------------------------------------------------------------
+//
+template <class T>
+void BTreeIndex::insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, PageKeyPair<T> &pk, int pos, int m)
+{
+	for (int i = m - 1; i >= pos; --i)
+	{
+		nodeIntPtr->pageNoArray[i + 1] = nodeIntPtr->pageNoArray[i];
+		nodeIntPtr->keyArray[i + 1] = nodeIntPtr->keyArray[i];
+	}
+
+	nodeIntPtr->pageNoArray[pos] = pk.pageNo;
+	nodeIntPtr->keyArray[pos] = pk.key;
 }
 
 }

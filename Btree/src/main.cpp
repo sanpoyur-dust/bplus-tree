@@ -92,6 +92,7 @@ void setLeafInfo(
 		const std::vector<int> &keys);
 void myTest0();
 void myTest1();
+void myTest2();
 
 int main(int argc, char **argv)
 {
@@ -711,6 +712,16 @@ void setLeafInfo(
 // a tree with height 2
 void myTest0()
 {
+	try
+	{
+		File::remove(relationName);
+	}
+	catch(const FileNotFoundException &e)
+	{
+	}
+
+  file1 = new PageFile(relationName, true);
+
 	{
 		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
 		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
@@ -800,11 +811,23 @@ void myTest0()
 	}
 	catch (const FileNotFoundException &e)
 	{}
+
+	deleteRelation();
 }
 
 // a tree with height 3
 void myTest1()
 {
+	try
+	{
+		File::remove(relationName);
+	}
+	catch(const FileNotFoundException &e)
+	{
+	}
+
+  file1 = new PageFile(relationName, true);
+
 	{
 		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
 		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
@@ -894,4 +917,11 @@ void myTest1()
 	}
 	catch (const FileNotFoundException &e)
 	{}
+
+	deleteRelation();
+}
+
+// TODO: insertion with enough space
+void myTest2()
+{
 }
