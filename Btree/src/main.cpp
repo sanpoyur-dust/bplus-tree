@@ -160,9 +160,9 @@ int main(int argc, char **argv)
 	// myTest3();
 
 	test1();
-	// test2();
-	// test3();
-	// errorTests();
+	test2();
+	test3();
+	errorTests();
 
 	delete bufMgr;
 

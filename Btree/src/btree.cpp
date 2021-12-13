@@ -516,7 +516,7 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 			bufMgr->allocPage(file, splitPageNum, splitPage);
 
 			auto *splitLeafIntPtr = (LeafNodeInt *)splitPage;
-			clearLeaf(splitLeafIntPtr, Page::INVALID_NUMBER, 0, m); // TODO: not this
+			clearLeaf(splitLeafIntPtr, nxtLeafIntPtr->rightSibPageNo, 0, m);
 
 			// copy the right half to the split node
 			// if inserted in the left, the median changes
