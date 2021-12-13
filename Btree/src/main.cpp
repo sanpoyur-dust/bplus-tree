@@ -93,6 +93,7 @@ void setLeafInfo(
 void myTest0();
 void myTest1();
 void myTest2();
+void myTest3();
 
 int main(int argc, char **argv)
 {
@@ -153,9 +154,10 @@ int main(int argc, char **argv)
 
 	File::remove(relationName);
 
-	myTest0();
-	myTest1();
+	// myTest0();
+	// myTest1();
 	myTest2();
+	myTest3();
 
 	// test1();
 	// test2();
@@ -922,8 +924,67 @@ void myTest1()
 	deleteRelation();
 }
 
-// TODO: insertion with enough space
+// insertion with enough space
 void myTest2()
+{
+	std::vector<RecordId> ridVec;
+	try
+	{
+		File::remove(relationName);
+	}
+	catch(const FileNotFoundException &e)
+	{
+	}
+
+  file1 = new PageFile(relationName, true);
+
+	memset(record1.s, ' ', sizeof(record1.s));
+	PageId new_page_number;
+  Page new_page = file1->allocatePage(new_page_number);
+
+  // Insert a bunch of tuples into the relation.
+  for(int i = 0; i < 50; i++)
+	{
+    sprintf(record1.s, "%05d string record", i);
+    record1.i = i;
+    record1.d = (double)i;
+    std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
+
+		while(1)
+		{
+			try
+			{
+    		new_page.insertRecord(new_data);
+				break;
+			}
+			catch(const InsufficientSpaceException &e)
+			{
+				file1->writePage(new_page_number, new_page);
+  			new_page = file1->allocatePage(new_page_number);
+			}
+		}
+  }
+
+	file1->writePage(new_page_number, new_page);
+
+	{
+		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
+		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+		checkPassFail(intScan(&index, 2, GTE, 683, LT), 48)
+	}
+
+	try
+	{
+		File::remove(intIndexName);
+	}
+	catch (const FileNotFoundException &e)
+	{}
+
+	deleteRelation();
+}
+
+// insert with split
+void myTest3()
 {
 	std::vector<RecordId> ridVec;
 	try

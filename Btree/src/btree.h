@@ -331,12 +331,25 @@ class BTreeIndex {
    * TODO: documentation
    */
   template <class T>
-  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, RIDKeyPair<T> &rk, int pos);
+  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
+
   /**
    * TODO: documentation
    */
   template<class T>
-  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, PageKeyPair<T> &pk, int pos);
+  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
+
+  /**
+   * TODO: documentation
+   */
+  template <class T>
+  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
+
+  void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
+
+  void clearLeaf(LeafNodeInt *leafIntPtr, int st, int ed);
+
+  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
 
  public:
 
