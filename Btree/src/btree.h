@@ -347,7 +347,7 @@ class BTreeIndex {
 
   void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
 
-  void clearLeaf(LeafNodeInt *leafIntPtr, int st, int ed);
+  void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
 
   PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
 

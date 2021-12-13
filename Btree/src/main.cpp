@@ -156,10 +156,10 @@ int main(int argc, char **argv)
 
 	// myTest0();
 	// myTest1();
-	myTest2();
-	myTest3();
+	// myTest2();
+	// myTest3();
 
-	// test1();
+	test1();
 	// test2();
 	// test3();
 	// errorTests();
@@ -1029,7 +1029,7 @@ void myTest3()
 	{
 		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
 		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-		checkPassFail(intScan(&index, 2, GTE, 25, LT), 23)
+		checkPassFail(intScan(&index, 50, GTE, 690, LT), 633)
 	}
 
 	try

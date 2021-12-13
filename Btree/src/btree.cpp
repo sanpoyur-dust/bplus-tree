@@ -91,6 +91,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		bufMgr->unPinPage(file, leafPageNum, true);
 
 		FileScan fscan = FileScan(relationName, bufMgr);
+		int cnt = 0;
 		try
 		{
 			RecordId scanRid;
@@ -101,6 +102,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 				const char *record = recordStr.c_str();
 				const void *key = record + attrByteOffset;
 				insertEntry(key, scanRid);
+				++cnt;
 			}
 		}
 		catch(const EndOfFileException &e)
@@ -505,6 +507,8 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 		if (m != leafOccupancy)
 		{
 			insertRIDKeyPair(nxtLeafIntPtr, m, rk, pos);
+			bufMgr->unPinPage(file, nxtPageNum, true);
+			return true;
 		}
 		else
 		{
@@ -514,8 +518,9 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 			PageId splitPageNum;
 			Page *splitPage;
 			bufMgr->allocPage(file, splitPageNum, splitPage);
+
 			auto *splitLeafIntPtr = (LeafNodeInt *)splitPage;
-			clearLeaf(splitLeafIntPtr, 0, m);
+			clearLeaf(splitLeafIntPtr, Page::INVALID_NUMBER, 0, m); // TODO: not this
 
 			// copy the right half to the split node
 			// if inserted in the left, the median changes
@@ -544,18 +549,12 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 			pushedOrCopied = {splitPageNum, nxtLeafIntPtr->keyArray[mid]};
 
 			// clear the right half
-			clearLeaf(nxtLeafIntPtr, mid, m);
+			clearLeaf(nxtLeafIntPtr, splitPageNum, mid, m);
 
 			bufMgr->unPinPage(file, splitPageNum, true);
-		}
-		
-		if (m != leafOccupancy)
-		{
-			bufMgr->unPinPage(file, nxtPageNum, true);
-			return true;
-		}
 
-		// if pushed up, insert in the current node
+			// if pushed up, insert in the current node
+		}
 	}
 	else
 	{
@@ -593,7 +592,7 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 	// insert in the current node
 	if (m != nodeOccupancy)
 	{
-		insertPageKeyPair(nodeIntPtr, m, pk, pos);
+		insertPageKeyPair(nodeIntPtr, m, pushedOrCopied, pos);
 	}
 	else
 	{
@@ -603,6 +602,7 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 		PageId splitPageNum;
 		Page *splitPage;
 		bufMgr->allocPage(file, splitPageNum, splitPage);
+
 		auto *splitNodeIntPtr = (NonLeafNodeInt *)splitPage;
 		clearNode(splitNodeIntPtr, nodeIntPtr->level, 0, m);
 
@@ -652,14 +652,14 @@ void BTreeIndex::clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed
 	nodeIntPtr->pageNoArray[ed] = Page::INVALID_NUMBER;
 }
 
-void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, int st, int ed)
+void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed)
 {
 	for (int i = st; i < ed; ++i)
 	{
 		leafIntPtr->keyArray[i] = 0;
 		leafIntPtr->ridArray[i] = {Page::INVALID_NUMBER, Page::INVALID_SLOT, 0};
 	}
-	leafIntPtr->rightSibPageNo = Page::INVALID_NUMBER;
+	leafIntPtr->rightSibPageNo = rightSibPageNo;
 }
 
 PageId BTreeIndex::findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val)
