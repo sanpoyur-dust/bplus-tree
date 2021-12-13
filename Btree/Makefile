@@ -49,8 +49,11 @@ clean:
 	rm -rf src/exceptions/*.o;\
 	rm -f src/badgerdb_main
 
-rel:
-	rm src/relA*
-
 doc:
 	doxygen Doxyfile
+
+run:
+	./src/badgerdb_main
+
+debug:
+	gdb ./src/badgerdb_main
