@@ -17,9 +17,6 @@
 #include "file.h"
 #include "buffer.h"
 
-// TODO: remove after testing!!!
-#define private public
-
 namespace badgerdb
 {
 
