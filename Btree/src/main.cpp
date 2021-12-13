@@ -411,7 +411,7 @@ int intScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Operato
   std::cout << std::endl;
 
   int numResults = 0;
-	
+
 	try
 	{
   	index->startScan(&lowVal, lowOp, &highVal, highOp);

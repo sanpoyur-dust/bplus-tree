@@ -239,10 +239,6 @@ void BTreeIndex::startScan(const void* lowValParm,
 			// return if found
 			return;
 		}
-
-		// otherwise, be ready to throw an exception
-		bufMgr->unPinPage(file, currentPageNum, false);
-		currentPageNum = Page::INVALID_NUMBER;
 	}
 	
 	// throw an exception if no such entry is found
