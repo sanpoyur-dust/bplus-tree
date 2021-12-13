@@ -342,10 +342,19 @@ class BTreeIndex {
   template <class T>
   bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
 
+  /**
+   * TODO: documentation
+   */
   void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
 
+  /**
+   * TODO: documentation
+   */
   void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
 
+  /**
+   * TODO: documentation
+   */
   PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
 
  public:

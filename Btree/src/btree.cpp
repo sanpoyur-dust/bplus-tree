@@ -72,16 +72,12 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 		// set the root node information
 		auto *rootIntPtr = (NonLeafNodeInt *)rootPage;
-		rootIntPtr->level = 1;
-		std::fill_n(rootIntPtr->keyArray, nodeOccupancy, 0);
-		std::fill_n(rootIntPtr->pageNoArray, nodeOccupancy + 1, (PageId)Page::INVALID_NUMBER);
+		clearNode(rootIntPtr, 1, 0, nodeOccupancy);
 
 		// allocate the leaf page
 		bufMgr->allocPage(file, leafPageNum, leafPage);
 		auto *leafPagePtr = (LeafNodeInt *)leafPage;
-		std::fill_n(leafPagePtr->keyArray, leafOccupancy, 0);
-		std::fill_n(leafPagePtr->ridArray, leafOccupancy, (RecordId){Page::INVALID_NUMBER, Page::INVALID_SLOT, 0});
-		leafPagePtr->rightSibPageNo = Page::INVALID_NUMBER;
+		clearLeaf(leafPagePtr, Page::INVALID_NUMBER, 0, leafOccupancy);
 
 		rootIntPtr->pageNoArray[0] = leafPageNum;
 
@@ -637,6 +633,10 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 	return m != nodeOccupancy;
 }
 
+// -----------------------------------------------------------------------------
+// BTreeIndex::clearNode
+// -----------------------------------------------------------------------------
+//
 void BTreeIndex::clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed)
 {
 	nodeIntPtr->level = level;
@@ -648,6 +648,10 @@ void BTreeIndex::clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed
 	nodeIntPtr->pageNoArray[ed] = Page::INVALID_NUMBER;
 }
 
+// -----------------------------------------------------------------------------
+// BTreeIndex::clearLeaf
+// -----------------------------------------------------------------------------
+//
 void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed)
 {
 	for (int i = st; i < ed; ++i)
@@ -658,6 +662,10 @@ void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int s
 	leafIntPtr->rightSibPageNo = rightSibPageNo;
 }
 
+// -----------------------------------------------------------------------------
+// BTreeIndex::findPageNumInNode
+// -----------------------------------------------------------------------------
+//
 PageId BTreeIndex::findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val)
 {
 	// check if the root has no key, i.e., less than 2 children
