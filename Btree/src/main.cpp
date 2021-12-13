@@ -943,7 +943,7 @@ void myTest2()
   Page new_page = file1->allocatePage(new_page_number);
 
   // Insert a bunch of tuples into the relation.
-  for(int i = 0; i < 50; i++)
+  for(int i = 0; i < 682; i++)
 	{
     sprintf(record1.s, "%05d string record", i);
     record1.i = i;
@@ -970,7 +970,7 @@ void myTest2()
 	{
 		std::cout << "Create a B+ Tree index on the integer field" << std::endl;
 		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-		checkPassFail(intScan(&index, 2, GTE, 683, LT), 48)
+		checkPassFail(intScan(&index, 50, GTE, 690, LT), 632)
 	}
 
 	try
@@ -1002,7 +1002,7 @@ void myTest3()
   Page new_page = file1->allocatePage(new_page_number);
 
   // Insert a bunch of tuples into the relation.
-  for(int i = 0; i < 50; i++)
+  for(int i = 0; i < 683; i++)
 	{
     sprintf(record1.s, "%05d string record", i);
     record1.i = i;

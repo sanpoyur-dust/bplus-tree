@@ -164,9 +164,6 @@ BTreeIndex::~BTreeIndex()
 
 void BTreeIndex::insertEntry(const void *key, const RecordId rid) 
 {
-	// store the current root page id temporarily 
-	PageId tmp = rootPageNum;
-
 	Page *rootPage;
 	bufMgr->readPage(file, rootPageNum, rootPage);
 	auto *rootIntPtr = (NonLeafNodeInt *)rootPage;
@@ -177,8 +174,16 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 	if (!insertEntryAux(rootIntPtr, inserted, pushed))
 	{
 		// if pushed up, insert in the new root
-		bufMgr->unPinPage(file, tmp, true);
-		bufMgr->readPage(file, rootPageNum, rootPage);
+		bufMgr->unPinPage(file, rootPageNum, true);
+
+		// update the root
+		PageId oldRootPageNum = rootPageNum;
+		rootPageNum = pushed.pageNo;
+		bufMgr->allocPage(file, rootPageNum, rootPage);
+		rootIntPtr = (NonLeafNodeInt *)rootPage;
+		clearNode(rootIntPtr, 0, 0, nodeOccupancy);
+
+		rootIntPtr->pageNoArray[0] = oldRootPageNum;
 		insertPageKeyPair(rootIntPtr, 0, pushed, 0);
 	}
 
@@ -471,11 +476,11 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 	Page *nxtPage;
 	bufMgr->readPage(file, nxtPageNum, nxtPage);
 
-	bool full = false;
-	PageKeyPair<int> pushed;
+	PageKeyPair<int> pushedOrCopied;
 
 	if (nodeIntPtr->level == 1)
 	{
+		// insert in the child leaf
 		auto *nxtLeafIntPtr = (LeafNodeInt *)nxtPage;
 
 		int m = leafOccupancy;    // number of pages in the leaf
@@ -535,96 +540,105 @@ bool BTreeIndex::insertEntryAux(NonLeafNodeInt *nodeIntPtr, const RIDKeyPair<T> 
 				insertRIDKeyPair(splitLeafIntPtr, m - mid, rk, pos - mid);
 			}
 
-			// push up the median
-			pk = {splitPageNum, nxtLeafIntPtr->keyArray[mid]};
+			// copy up the median
+			pushedOrCopied = {splitPageNum, nxtLeafIntPtr->keyArray[mid]};
 
 			// clear the right half
 			clearLeaf(nxtLeafIntPtr, mid, m);
 
 			bufMgr->unPinPage(file, splitPageNum, true);
 		}
+		
+		if (m != leafOccupancy)
+		{
+			bufMgr->unPinPage(file, nxtPageNum, true);
+			return true;
+		}
 
-		// if copied up, insert in the current node
-		full = m == leafOccupancy;
+		// if pushed up, insert in the current node
 	}
 	else
 	{
+		// insert in the child node
 		auto *nxtNodeIntPtr = (NonLeafNodeInt *)nxtPage;
 
-		// if pushed up, insert in the current node
-		full = !insertEntryAux(nxtNodeIntPtr, rk, pushed);
-	}
-
-	if (full)
-	{
-		int m = nodeOccupancy;    // number of pages in the node
-		int pos = nodeOccupancy;  // position to insert
-		for (int i = 0; i < nodeOccupancy; ++i)
+		if (insertEntryAux(nxtNodeIntPtr, rk, pushedOrCopied))
 		{
-			if (nodeIntPtr->pageNoArray[i + 1] == Page::INVALID_NUMBER)
-			{
-				m = i;
-				if (pos == nodeOccupancy)
-				{
-					pos = m;
-				}
-				break;
-			}
-			if (pos == nodeOccupancy && nodeIntPtr->keyArray[i] > pushed.key)
-			{
-				pos = i;
-			}
+			bufMgr->unPinPage(file, nxtPageNum, true);
+			return true;
 		}
 
-		if (m != nodeOccupancy)
+		// if pushed up, insert in the current node
+	}
+
+	int m = nodeOccupancy;    // number of pages in the node
+	int pos = nodeOccupancy;  // position to insert
+	for (int i = 0; i < nodeOccupancy; ++i)
+	{
+		if (nodeIntPtr->pageNoArray[i + 1] == Page::INVALID_NUMBER)
 		{
-			insertPageKeyPair(nodeIntPtr, m, pk, pos);
+			m = i;
+			if (pos == nodeOccupancy)
+			{
+				pos = m;
+			}
+			break;
+		}
+		if (pos == nodeOccupancy && nodeIntPtr->keyArray[i] > pushedOrCopied.key)
+		{
+			pos = i;
+		}
+	}
+
+	// insert in the current node
+	if (m != nodeOccupancy)
+	{
+		insertPageKeyPair(nodeIntPtr, m, pk, pos);
+	}
+	else
+	{
+		int mid = (m + 1) >> 1;  // median position
+
+		// allocate a newly split node page
+		PageId splitPageNum;
+		Page *splitPage;
+		bufMgr->allocPage(file, splitPageNum, splitPage);
+		auto *splitNodeIntPtr = (NonLeafNodeInt *)splitPage;
+		clearNode(splitNodeIntPtr, nodeIntPtr->level, 0, m);
+
+		// copy the right half to the split node
+		int cnt = 0;
+		splitNodeIntPtr->pageNoArray[0] = nodeIntPtr->pageNoArray[mid];
+		for (int i = mid; i < m; ++i)
+		{
+			splitNodeIntPtr->keyArray[cnt] = nodeIntPtr->keyArray[i];
+			splitNodeIntPtr->pageNoArray[cnt + 1] = nodeIntPtr->pageNoArray[i + 1];
+			++cnt;
+		}
+
+		if (pos <= mid)
+		{
+			// insert in the left half
+			insertPageKeyPair(nodeIntPtr, mid + 1, pushedOrCopied, pos);
 		}
 		else
 		{
-			int mid = (m + 1) >> 1;  // median position
-
-			// allocate a newly split node page
-			PageId splitPageNum;
-			Page *splitPage;
-			bufMgr->allocPage(file, splitPageNum, splitPage);
-			auto *splitNodeIntPtr = (NonLeafNodeInt *)splitPage;
-			clearNode(splitNodeIntPtr, nodeIntPtr->level, 0, m);
-
-			// copy the right half to the split node
-			int cnt = 0;
-			splitNodeIntPtr->pageNoArray[0] = nodeIntPtr->pageNoArray[mid];
-			for (int i = mid; i < m; ++i)
-			{
-				splitNodeIntPtr->keyArray[cnt] = nodeIntPtr->keyArray[i];
-				splitNodeIntPtr->pageNoArray[cnt + 1] = nodeIntPtr->pageNoArray[i + 1];
-				++cnt;
-			}
-
-			if (pos <= mid)
-			{
-				// insert in the left half
-				insertPageKeyPair(nodeIntPtr, mid + 1, pushed, pos);
-			}
-			else
-			{
-				// insert in the split node
-				insertPageKeyPair(splitNodeIntPtr, m - mid - 1, pushed, pos - mid);
-			}
-
-			// push up the median
-			pk = {splitPageNum, nodeIntPtr->keyArray[mid]};
-
-			// clear the right half
-			clearNode(nodeIntPtr, nodeIntPtr->level, mid, m);
-
-			bufMgr->unPinPage(file, splitPageNum, true);
+			// insert in the split node
+			insertPageKeyPair(splitNodeIntPtr, m - mid - 1, pushedOrCopied, pos - mid);
 		}
+
+		// push up the median
+		pk = {splitPageNum, nodeIntPtr->keyArray[mid]};
+
+		// clear the right half
+		clearNode(nodeIntPtr, nodeIntPtr->level, mid, m);
+
+		bufMgr->unPinPage(file, splitPageNum, true);
 	}
 
 	bufMgr->unPinPage(file, nxtPageNum, true);
 
-	return !full;
+	return m != nodeOccupancy;
 }
 
 void BTreeIndex::clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed)
