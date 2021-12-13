@@ -50,13 +50,15 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 	Page *headerPage;  // header page
 	Page *rootPage;    // root page
+	Page *leafPage;    // leaf page
+	PageId leafPageNum;
 
 	if (!File::exists(outIndexName))
 	{
 		// create a new index file if it doesn't exist
 		file = new BlobFile(outIndexName, true);
 
-		// allocate the header page and root page
+		// allocate the header page, root page
 		bufMgr->allocPage(file, headerPageNum, headerPage);
 		bufMgr->allocPage(file, rootPageNum, rootPage);
 
@@ -74,9 +76,19 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		std::fill_n(rootIntPtr->keyArray, nodeOccupancy, 0);
 		std::fill_n(rootIntPtr->pageNoArray, nodeOccupancy + 1, (PageId)Page::INVALID_NUMBER);
 
+		// allocate the leaf page
+		bufMgr->allocPage(file, leafPageNum, leafPage);
+		auto *leafPagePtr = (LeafNodeInt *)leafPage;
+		std::fill_n(leafPagePtr->keyArray, leafOccupancy, 0);
+		std::fill_n(leafPagePtr->ridArray, leafOccupancy, (RecordId){Page::INVALID_NUMBER, Page::INVALID_SLOT, 0});
+		leafPagePtr->rightSibPageNo = Page::INVALID_NUMBER;
+
+		rootIntPtr->pageNoArray[0] = leafPageNum;
+
 		// unpin with modification
 		bufMgr->unPinPage(file, headerPageNum, true);
 		bufMgr->unPinPage(file, rootPageNum, true);
+		bufMgr->unPinPage(file, leafPageNum, true);
 
 		FileScan fscan = FileScan(relationName, bufMgr);
 		try
@@ -155,42 +167,53 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 	int val = *(int *)key;
 
 	// find the leaf where the entry should belong
-	PageId leafPageNum = findLeafPageNum(val, GTE);
 	Page *leafPage;
+	PageId leafPageNum = findLeafPageNum(val, GTE);
 	bufMgr->readPage(file, leafPageNum, leafPage);
 
 	auto *leafIntPtr = (LeafNodeInt *)leafPage;
 
-	// determine the number of valid entries in the leaf
-	int m = 0;
-	while (m < leafOccupancy
-			&& leafIntPtr->ridArray[m].page_number != Page::INVALID_NUMBER)
+	int m = leafOccupancy;    // number of pages in the leaf
+	int pos = leafOccupancy;  // position to insert
+	for (int i = 0; i < leafOccupancy; ++i)
 	{
-		++m;
-	}
-
-	// locate an entry with a larger key in the leaf
-	int pos = m;  // the position to insert the entry
-	for (int i = 0; i < m; ++i)
-	{
-		if (leafIntPtr->keyArray[i] > val)
+		if (leafIntPtr->ridArray[i].page_number == Page::INVALID_NUMBER)
+		{
+			m = i;
+			if (pos == leafOccupancy)
+			{
+				pos = m;
+			}
+			break;
+		}
+		if (pos == leafOccupancy && leafIntPtr->keyArray[i] > val)
 		{
 			pos = i;
-			break;
 		}
 	}
 
 	// check if there is enough space
-	if (m < leafOccupancy)
+	if (m != leafOccupancy)
 	{
 		RIDKeyPair<int> rk;
 		rk.set(rid, val);
-		insertRIDKeyPair(leafIntPtr, rk, pos, m);
+		insertRIDKeyPair(leafIntPtr, m, rk, pos);
 	}
 	else
 	{
 		std::cout << "TODO: there is no enough space..." << std::endl;
 		throw std::exception();
+
+		// allocate a newly split leaf page
+		PageId splitNum;
+		Page *split;
+		bufMgr->allocPage(file, splitNum, split);
+		auto *splitPtr = (LeafNodeInt *)split;
+		std::fill_n(splitPtr->keyArray, leafOccupancy, 0);
+		std::fill_n(splitPtr->ridArray, leafOccupancy, (RecordId){Page::INVALID_NUMBER, Page::INVALID_SLOT, 0});
+		splitPtr->rightSibPageNo = Page::INVALID_NUMBER;
+
+		bufMgr->unPinPage(file, splitNum, true);
 	}
 
 	// unpin with modification
@@ -272,6 +295,8 @@ void BTreeIndex::scanNext(RecordId& outRid)
 		throw IndexScanCompletedException();
 	}
 
+	outRid = ((LeafNodeInt *)currentPageData)->ridArray[nextEntry];
+
 	findScanEntry();
 }
 
@@ -311,12 +336,23 @@ PageId BTreeIndex::findLeafPageNum(int val, Operator op)
 	Page *curPage;
 	bufMgr->readPage(file, curPageNum, curPage);
 
-	int level;  // previous level
+	int level;          // previous level
+	PageId nxtPageNum;  // next page id
 
 	do
 	{
 		auto *curNodeIntPtr = (NonLeafNodeInt *)curPage;
 		level = curNodeIntPtr->level;
+
+		// check if the root has no key, i.e., less than 2 children
+		if (curNodeIntPtr->pageNoArray[1] == Page::INVALID_NUMBER)
+		{
+			nxtPageNum = curNodeIntPtr->pageNoArray[0];
+
+			// unpin the page without modification
+			bufMgr->unPinPage(file, curPageNum, false);
+			return nxtPageNum;
+		}
 
 		// find the leftmost valid children page
 		for (int i = 0; 
@@ -329,8 +365,9 @@ PageId BTreeIndex::findLeafPageNum(int val, Operator op)
 					|| curNodeIntPtr->pageNoArray[i + 1] == Page::INVALID_NUMBER
 					|| compareOp(curNodeIntPtr->keyArray[i], val, op))
 			{
+				nxtPageNum = curNodeIntPtr->pageNoArray[i];
+
 				// unpin the current page without modification
-				PageId nxtPageNum = curNodeIntPtr->pageNoArray[i];
 				bufMgr->unPinPage(file, curPageNum, false);
 
 				// check if the next page is a leaf
@@ -347,6 +384,8 @@ PageId BTreeIndex::findLeafPageNum(int val, Operator op)
 		}
 	} while (true);
 
+	// unpin the page without modification
+	bufMgr->unPinPage(file, curPageNum, false);
 	return Page::INVALID_NUMBER;
 }
 
@@ -425,7 +464,7 @@ bool BTreeIndex::findScanEntry()
 // -----------------------------------------------------------------------------
 //
 template <class T>
-void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, RIDKeyPair<T> &rk, int pos, int m)
+void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, RIDKeyPair<T> &rk, int pos)
 {
 	for (int i = m - 1; i >= pos; --i)
 	{
@@ -442,7 +481,7 @@ void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, RIDKeyPair<T> &rk, in
 // -----------------------------------------------------------------------------
 //
 template <class T>
-void BTreeIndex::insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, PageKeyPair<T> &pk, int pos, int m)
+void BTreeIndex::insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, PageKeyPair<T> &pk, int pos)
 {
 	for (int i = m - 1; i >= pos; --i)
 	{
