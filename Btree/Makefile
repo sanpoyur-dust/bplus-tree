@@ -51,3 +51,9 @@ clean:
 
 doc:
 	doxygen Doxyfile
+
+run:
+	./src/badgerdb_main
+
+debug:
+	gdb ./src/badgerdb_main

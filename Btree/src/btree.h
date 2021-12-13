@@ -17,9 +17,6 @@
 #include "file.h"
 #include "buffer.h"
 
-// TODO: remove after testing!!!
-#define private public
-
 namespace badgerdb
 {
 
@@ -318,7 +315,7 @@ class BTreeIndex {
    * Find the leftmost leaf with an upper bound satisfying the given condition with the given value.
    * Return the page number.
    */
-  PageId findLeafPageNum(PageId curPageNum, int val, Operator op);
+  PageId findLeafPageNum(int val, Operator op);
 
   /**
    * TODO: documentation
@@ -326,6 +323,39 @@ class BTreeIndex {
    * Return whether found or not.
    */
 	bool findScanEntry();
+
+  /**
+   * TODO: documentation
+   */
+  template <class T>
+  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
+
+  /**
+   * TODO: documentation
+   */
+  template<class T>
+  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
+
+  /**
+   * TODO: documentation
+   */
+  template <class T>
+  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
+
+  /**
+   * TODO: documentation
+   */
+  void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
+
+  /**
+   * TODO: documentation
+   */
+  void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
+
+  /**
+   * TODO: documentation
+   */
+  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
 
  public:
 
