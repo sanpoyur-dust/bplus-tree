@@ -592,12 +592,12 @@ void BTreeIndex::clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed
 //
 void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed)
 {
+	leafIntPtr->rightSibPageNo = rightSibPageNo;
 	for (int i = st; i < ed; ++i)
 	{
 		leafIntPtr->keyArray[i] = 0;
 		leafIntPtr->ridArray[i] = {Page::INVALID_NUMBER, Page::INVALID_SLOT, 0};
 	}
-	leafIntPtr->rightSibPageNo = rightSibPageNo;
 }
 
 // -----------------------------------------------------------------------------

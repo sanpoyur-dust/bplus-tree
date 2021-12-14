@@ -321,29 +321,52 @@ class BTreeIndex {
    * TODO: documentation
    */
   template <class T>
-  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
+  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
 
   /**
-   * TODO: documentation
+   * Clear the non leaf node with the specified information.
+   * It resets the level, keys, and the pages.
+   * Keys will be cleared from index st to ed - 1.
+   * Pages will be cleared from index st to ed.
+   * @param nodeIntPtr Non leaf node to clear
+   * @param level Level to reset
+   * @param st (Inclusive) lower bound to clear
+   * @param ed (Exclusive) upper bound to clear 
+   */
+  void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
+
+  /**
+   * Clear the leaf node with the specified information.
+   * It resets the right sibling page ID, keys, and the record IDs.
+   * Keys will be cleared from index st to ed - 1.
+   * Record IDs will be cleared from index st to ed - 1.
+   * @param leafIntPtr Leaf node to clear
+   * @param rightSibPageNo Right sibling page ID to reset
+   * @param st (Inclusive) lower bound to clear
+   * @param ed (Exclusive) upper bound to clear 
+   */
+  void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
+
+  /**
+   * Insert the specified <pid, key> pair into the non leaf node at the position.
+   * Note that the key corresponds to the upper bound of the page.
+   * @param nodeIntPtr Non leaf node to insert into
+   * @param m Number of valid keys
+   * @param pk <pid, key> pair
+   * @param pos Insert position
    */
   template<class T>
   void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
 
   /**
-   * TODO: documentation
+   * Insert the specified <rid, key> pair into the leaf node at the postion.
+   * @param leafIntPtr Leaf node to insert into
+   * @param m Number of valid keys
+   * @param rk <rid, key> pair
+   * @param pos Insert position
    */
   template <class T>
-  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
-
-  /**
-   * TODO: documentation
-   */
-  void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
-
-  /**
-   * TODO: documentation
-   */
-  void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
+  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
 
   /**
    * Find the page ID for the leftmost page with keys possibly GT/GTE the given value.
