@@ -42,7 +42,11 @@ enum Operator
 };
 
 /**
- * TODO: documentation
+ * Compare x and y using the given operator.
+ * @param x Left value
+ * @param y Right value
+ * @param op Operator (LT/LTE/GTE/GT)
+ * @return whether x op y or not
  */
 inline bool compareOp(int x, int y, Operator op)
 {
@@ -311,51 +315,117 @@ class BTreeIndex {
 	Operator	highOp;
 
   /**
-   * TODO: documentation
-   * Find the leftmost leaf with an upper bound satisfying the given condition with the given value.
-   * Return the page number.
-   */
-  PageId findLeafPageNum(int val, Operator op);
-
-  /**
-   * TODO: documentation
-   * Find the next entry with a key that lies within the search bound
-   * Return whether found or not.
-   */
-	bool findScanEntry();
-
-  /**
-   * TODO: documentation
-   */
-  template <class T>
-  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
-
-  /**
-   * TODO: documentation
-   */
-  template<class T>
-  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
-
-  /**
-   * TODO: documentation
-   */
-  template <class T>
-  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
-
-  /**
-   * TODO: documentation
+   * Clear the non leaf node with the specified information.
+   * It resets the level, keys, and the pages.
+   * Keys will be cleared from index st to ed - 1.
+   * Pages will be cleared from index st to ed.
+   * @param nodeIntPtr Non leaf node to clear
+   * @param level Level to reset
+   * @param st (Inclusive) lower bound to clear
+   * @param ed (Exclusive) upper bound to clear 
    */
   void clearNode(NonLeafNodeInt *nodeIntPtr, int level, int st, int ed);
 
   /**
-   * TODO: documentation
+   * Clear the leaf node with the specified information.
+   * It resets the right sibling page ID, keys, and the record IDs.
+   * Keys will be cleared from index st to ed - 1.
+   * Record IDs will be cleared from index st to ed - 1.
+   * @param leafIntPtr Leaf node to clear
+   * @param rightSibPageNo Right sibling page ID to reset
+   * @param st (Inclusive) lower bound to clear
+   * @param ed (Exclusive) upper bound to clear 
    */
   void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
 
   /**
-   * TODO: documentation
+   * Find the page ID for the leftmost page with keys possibly GT/GTE the given value.
+   * This happens if the upper bound of the page is GT/GTE the given value.
+   * In the special case when the node has no key, the first page ID is returned.
+   * @param nodeIntPtr Non leaf node to find in
+   * @param val A given key value
+   * @param op Operator (GT/GTE)
+   * @return the satisfying page ID
    */
-  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
+  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val, Operator op);
+
+  /**
+   * Find the page ID for the leftmost leaf page with keys possibly GT/GTE the given value.
+   * This happens if the upper bounds of the recursively found pages are GT/GTE the given value.
+   * In the special case when the root has no key, the first leaf page ID is returned.
+   * @param val A given key value
+   * @param op Operator (GT/GTE)
+   * @return the satisfying leaf page ID
+   */
+  PageId findLeafPageNum(int val, Operator op);
+
+  /**
+   * Update the next entry with a key that lies within the search bound.
+   * The corresponding current page and page ID will be updated as well.
+   * A starting current page should possibly contain keys satisfying the lower search bound.
+   * The current page will be set to invalid if such entry does not exist.
+   * For convenience, the invalid next entry has an index -1.
+   * @return whether such entry exist or not.
+   */
+	bool updateScanEntry();
+
+  /**
+   * Auxiliary method of insertPageKeyPair.
+   * Insert the specified <pid, key> pair into the non leaf node at the position.
+   * It assumes the non leaf node to have enough space.
+   * Note that the key corresponds to the upper bound of the page.
+   * @param nodeIntPtr Non leaf node to insert into
+   * @param m Number of valid keys
+   * @param pk <pid, key> pair to insert
+   * @param pos Insert position
+   */
+  template<class T>
+  void insertPageKeyPairAux(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
+
+  /**
+   * Auxiliary method of insertRIDKeyPair.
+   * Insert the specified <rid, key> pair into the leaf node at the postion.
+   * It assumes the leaf node to have enough space.
+   * @param leafIntPtr Leaf node to insert into
+   * @param m Number of valid keys
+   * @param rk <rid, key> pair to insert
+   * @param pos Insert position
+   */
+  template <class T>
+  void insertRIDKeyPairAux(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
+
+  /**
+   * Insert the specified <pid, key> pair into the non leaf node.
+   * If the non leaf node is full, it will be split with a retrned pushed up <pid, key> pair.
+   * @param nodeIntPtr Non leaf node to insert into
+   * @param pk1 <pid, key> pair to insert
+   * @param pk2 <pid, key> pair to copy up
+   * @return whether the insertion completes without split or not
+   */
+  template <class T>
+  bool insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, const PageKeyPair<T> &pk1, PageKeyPair<T> &pk2);
+
+  /**
+   * Insert the specified <rid, key> pair into the leaf node.
+   * If the leaf node is full, it will be split with a retrned copied up <pid, key> pair.
+   * @param leafIntPtr Leaf node to insert into
+   * @param rk <rid, key> pair to insert
+   * @param pk <pid, key> pair to copy up
+   * @return whether the insertion completes without split or not
+   */
+  template <class T>
+  bool insertRIDKeyPair(LeafNodeInt *leafIntPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
+
+  /**
+   * Auxiliary method of insertEntry.
+   * Insert the specified <rid, key> pair recursively starting from the non leaf node.
+   * If the non leaf node is full, it will be split with a retrned pushed up <pid, key> pair.
+   * @param nodeIntrPtr	non leaf node to start from
+   * @param rk <rid, key> pair to insert
+   * @param pk <pid, key> pair to pushed up
+   */
+  template <class T>
+  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
 
  public:
 
