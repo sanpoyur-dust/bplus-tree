@@ -1,4 +1,4 @@
-# Report
+# Design Report
 
 ## Design Choices
 
