@@ -417,8 +417,12 @@ class BTreeIndex {
   bool insertRIDKeyPair(LeafNodeInt *leafIntPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
 
   /**
-   * TODO: documentation
    * Auxiliary method of insertEntry.
+   * Insert the specified <rid, key> pair recursively starting from the non leaf node.
+   * If the non leaf node is full, it will be split with a retrned pushed up <pid, key> pair.
+   * @param nodeIntrPtr	non leaf node to start from
+   * @param rk <rid, key> pair to insert
+   * @param pk <pid, key> pair to pushed up
    */
   template <class T>
   bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
