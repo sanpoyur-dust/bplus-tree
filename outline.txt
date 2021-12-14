@@ -1,0 +1,9 @@
+This file is to show where are our design report and test cases.
+
+Design Report:
+--> See report.pdf
+
+Test Methods:
+--> See main.cpp, start from test4() are our tests method.
+
+Descriptions for design choices and test methods are reported in the report.pdf.
