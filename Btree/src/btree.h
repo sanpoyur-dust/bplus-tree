@@ -315,12 +315,6 @@ class BTreeIndex {
 	Operator	highOp;
 
   /**
-   * TODO: documentation
-   */
-  template <class T>
-  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
-
-  /**
    * Clear the non leaf node with the specified information.
    * It resets the level, keys, and the pages.
    * Keys will be cleared from index st to ed - 1.
@@ -343,27 +337,6 @@ class BTreeIndex {
    * @param ed (Exclusive) upper bound to clear 
    */
   void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
-
-  /**
-   * Insert the specified <pid, key> pair into the non leaf node at the position.
-   * Note that the key corresponds to the upper bound of the page.
-   * @param nodeIntPtr Non leaf node to insert into
-   * @param m Number of valid keys
-   * @param pk <pid, key> pair
-   * @param pos Insert position
-   */
-  template<class T>
-  void insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
-
-  /**
-   * Insert the specified <rid, key> pair into the leaf node at the postion.
-   * @param leafIntPtr Leaf node to insert into
-   * @param m Number of valid keys
-   * @param rk <rid, key> pair
-   * @param pos Insert position
-   */
-  template <class T>
-  void insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
 
   /**
    * Find the page ID for the leftmost page with keys possibly GT/GTE the given value.
@@ -395,6 +368,49 @@ class BTreeIndex {
    * @return whether such entry exist or not.
    */
 	bool updateScanEntry();
+
+  /**
+   * Auxiliary method of insertPageKeyPair.
+   * Insert the specified <pid, key> pair into the non leaf node at the position.
+   * It assumes the non leaf node to have enough space.
+   * Note that the key corresponds to the upper bound of the page.
+   * @param nodeIntPtr Non leaf node to insert into
+   * @param m Number of valid keys
+   * @param pk <pid, key> pair to insert
+   * @param pos Insert position
+   */
+  template<class T>
+  void insertPageKeyPairAux(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos);
+
+  /**
+   * Auxiliary method of insertRIDKeyPair.
+   * Insert the specified <rid, key> pair into the leaf node at the postion.
+   * It assumes the leaf node to have enough space.
+   * @param leafIntPtr Leaf node to insert into
+   * @param m Number of valid keys
+   * @param rk <rid, key> pair to insert
+   * @param pos Insert position
+   */
+  template <class T>
+  void insertRIDKeyPairAux(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
+
+  /**
+   * Insert the specified <rid, key> pair into the leaf node.
+   * If the leaf node is full, it will be split with a retrned copied up <pid, key> pair.
+   * @param leafIntPtr Leaf node to insert into
+   * @param rk <rid, key> pair to insert
+   * @param pk <pid, key> pair to copy up
+   * @return whether the insertion completes without split or not
+   */
+  template <class T>
+  bool insertRIDKeyPair(LeafNodeInt *leafIntPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
+
+  /**
+   * TODO: documentation
+   * Auxiliary method of insertEntry.
+   */
+  template <class T>
+  bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
 
  public:
 
