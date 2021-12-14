@@ -312,13 +312,6 @@ class BTreeIndex {
 
   /**
    * TODO: documentation
-   * Find the leftmost leaf with an upper bound satisfying the given condition with the given value.
-   * Return the page number.
-   */
-  PageId findLeafPageNum(int val, Operator op);
-
-  /**
-   * TODO: documentation
    * Find the next entry with a key that lies within the search bound
    * Return whether found or not.
    */
@@ -353,9 +346,25 @@ class BTreeIndex {
   void clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int st, int ed);
 
   /**
-   * TODO: documentation
+   * Find the page ID for the leftmost page with keys possibly GT/GTE the given value.
+   * This happens if the upper bound of the page is GT/GTE the given value.
+   * In the special case when the node has no key, the first page ID is returned.
+   * @param nodeIntPtr Non leaf node to find in
+   * @param val A given key value
+   * @param op Operator (GT/GTE)
+   * @return the satisfying page ID
    */
-  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val);
+  PageId findPageNumInNode(NonLeafNodeInt *nodeIntPtr, int val, Operator op);
+
+  /**
+   * Find the page ID for the leftmost leaf page with keys possibly GT/GTE the given value.
+   * This happens if the upper bounds of the recursively found pages are GT/GTE the given value.
+   * In the special case when the root has no key, the first leaf page ID is returned.
+   * @param val A given key value
+   * @param op Operator (GT/GTE)
+   * @return the satisfying leaf page ID
+   */
+  PageId findLeafPageNum(int val, Operator op);
 
  public:
 
