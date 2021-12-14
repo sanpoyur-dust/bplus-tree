@@ -227,12 +227,17 @@ void BTreeIndex::startScan(const void* lowValParm,
 	
 	// find the leftmost entry with a key that lies within the search bound
 	currentPageNum = findLeafPageNum(lowValInt, lowOp);
+
 	if (currentPageNum != Page::INVALID_NUMBER) {
+		// read the starting page possibly having the first entry
 		bufMgr->readPage(file, currentPageNum, currentPageData);
+
+		// this will be incremented later
 		nextEntry = -1;
 
-		// initialize the actual current page and next entry
-		if (findScanEntry())
+		// find the actual current page and first entry
+		// the starting page will be unpinned unless it is what we found
+		if (updateScanEntry())
 		{
 			// return if found
 			return;
@@ -261,9 +266,11 @@ void BTreeIndex::scanNext(RecordId& outRid)
 		throw IndexScanCompletedException();
 	}
 
+	// return the next record ID via reference
 	outRid = ((LeafNodeInt *)currentPageData)->ridArray[nextEntry];
 
-	findScanEntry();
+	// update the next record
+	updateScanEntry();
 }
 
 // -----------------------------------------------------------------------------
@@ -292,13 +299,14 @@ void BTreeIndex::endScan()
 }
 
 // -----------------------------------------------------------------------------
-// BTreeIndex::findScanEntry
+// BTreeIndex::updateScanEntry
 // -----------------------------------------------------------------------------
-//
-bool BTreeIndex::findScanEntry()
+
+bool BTreeIndex::updateScanEntry()
 {
-	auto *curLeafIntPtr = (LeafNodeInt *)currentPageData;  // current leaf pointer
-	do
+	auto *curLeafIntPtr = (LeafNodeInt *)currentPageData;
+
+	while (true)
 	{
 		++nextEntry;
 
@@ -306,33 +314,26 @@ bool BTreeIndex::findScanEntry()
 		if (nextEntry >= leafOccupancy
 				|| curLeafIntPtr->ridArray[nextEntry].page_number == Page::INVALID_NUMBER)
 		{
-			// need to change the page
-			// get the page number of the right sibling
-			PageId rightSibPageNum = curLeafIntPtr->rightSibPageNo;
-
-			// unpin the current page without modification
-			bufMgr->unPinPage(file, currentPageNum, false);
-
-			// check if at the end of all leaves
-			if (rightSibPageNum == Page::INVALID_NUMBER)
+			// break if at the end of all leaves
+			if (curLeafIntPtr->rightSibPageNo == Page::INVALID_NUMBER)
 			{
-				// reset correspondingly
-				currentPageNum = Page::INVALID_NUMBER;
-				currentPageData = nullptr;
-				nextEntry = -1;
-
-				return false;
+				break;
 			}
 
-			// chenge the page correspondingly
-			currentPageNum = rightSibPageNum;
+			// unpin and change the page to the right sibling page
+			bufMgr->unPinPage(file, currentPageNum, false);
+			currentPageNum = curLeafIntPtr->rightSibPageNo;
 			bufMgr->readPage(file, currentPageNum, currentPageData);
 			curLeafIntPtr = (LeafNodeInt *)currentPageData;
 
+			// it should always has at least one entry
 			nextEntry = 0;
 		}
 
-		// skip if the key is too small
+		// check if the key lies within the bound
+
+		// skip to the next one if the key is too small
+		// this only happens when a scan starts and the first entry is to be initialized
 		if (!compareOp(curLeafIntPtr->keyArray[nextEntry], lowValInt, lowOp))
 		{
 			continue;
@@ -348,51 +349,15 @@ bool BTreeIndex::findScanEntry()
 		// found if the key is within the range
 		// return directly without unpinning
 		return true;
-	} while (true);
+	}
 
-	// unpin the current page
+	// not found
+	// unpin the current page and reset information correspondingly
 	bufMgr->unPinPage(file, currentPageNum, false);
-
-	// reset correspondingly
 	currentPageNum = Page::INVALID_NUMBER;
 	currentPageData = nullptr;
 	nextEntry = -1;
-
 	return false;
-}
-
-// -----------------------------------------------------------------------------
-// BTreeIndex::insertRIDKeyPair
-// -----------------------------------------------------------------------------
-//
-template <class T>
-void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos)
-{
-	for (int i = m - 1; i >= pos; --i)
-	{
-		leafIntPtr->ridArray[i + 1] = leafIntPtr->ridArray[i];
-		leafIntPtr->keyArray[i + 1] = leafIntPtr->keyArray[i];
-	}
-
-	leafIntPtr->ridArray[pos] = rk.rid;
-	leafIntPtr->keyArray[pos] = rk.key;
-}
-
-// -----------------------------------------------------------------------------
-// BTreeIndex::insertPageKeyPair
-// -----------------------------------------------------------------------------
-//
-template <class T>
-void BTreeIndex::insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos)
-{
-	for (int i = m - 1; i >= pos; --i)
-	{
-		nodeIntPtr->pageNoArray[i + 2] = nodeIntPtr->pageNoArray[i + 1];
-		nodeIntPtr->keyArray[i + 1] = nodeIntPtr->keyArray[i];
-	}
-
-	nodeIntPtr->pageNoArray[pos + 1] = pk.pageNo;
-	nodeIntPtr->keyArray[pos] = pk.key;
 }
 
 // -----------------------------------------------------------------------------
@@ -598,6 +563,40 @@ void BTreeIndex::clearLeaf(LeafNodeInt *leafIntPtr, PageId rightSibPageNo, int s
 		leafIntPtr->keyArray[i] = 0;
 		leafIntPtr->ridArray[i] = {Page::INVALID_NUMBER, Page::INVALID_SLOT, 0};
 	}
+}
+
+// -----------------------------------------------------------------------------
+// BTreeIndex::insertPageKeyPair
+// -----------------------------------------------------------------------------
+
+template <class T>
+void BTreeIndex::insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, int m, const PageKeyPair<T> &pk, int pos)
+{
+	for (int i = m - 1; i >= pos; --i)
+	{
+		nodeIntPtr->pageNoArray[i + 2] = nodeIntPtr->pageNoArray[i + 1];
+		nodeIntPtr->keyArray[i + 1] = nodeIntPtr->keyArray[i];
+	}
+
+	nodeIntPtr->pageNoArray[pos + 1] = pk.pageNo;
+	nodeIntPtr->keyArray[pos] = pk.key;
+}
+
+// -----------------------------------------------------------------------------
+// BTreeIndex::insertRIDKeyPair
+// -----------------------------------------------------------------------------
+
+template <class T>
+void BTreeIndex::insertRIDKeyPair(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos)
+{
+	for (int i = m - 1; i >= pos; --i)
+	{
+		leafIntPtr->ridArray[i + 1] = leafIntPtr->ridArray[i];
+		leafIntPtr->keyArray[i + 1] = leafIntPtr->keyArray[i];
+	}
+
+	leafIntPtr->ridArray[pos] = rk.rid;
+	leafIntPtr->keyArray[pos] = rk.key;
 }
 
 // -----------------------------------------------------------------------------

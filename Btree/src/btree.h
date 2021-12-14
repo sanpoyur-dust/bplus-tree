@@ -42,7 +42,11 @@ enum Operator
 };
 
 /**
- * TODO: documentation
+ * Compare x and y using the given operator.
+ * @param x Left value
+ * @param y Right value
+ * @param op Operator (LT/LTE/GTE/GT)
+ * @return whether x op y or not
  */
 inline bool compareOp(int x, int y, Operator op)
 {
@@ -312,13 +316,6 @@ class BTreeIndex {
 
   /**
    * TODO: documentation
-   * Find the next entry with a key that lies within the search bound
-   * Return whether found or not.
-   */
-	bool findScanEntry();
-
-  /**
-   * TODO: documentation
    */
   template <class T>
   bool insertEntryAux(NonLeafNodeInt *nodeIntrPtr, const RIDKeyPair<T> &rk, PageKeyPair<T> &pk);
@@ -388,6 +385,16 @@ class BTreeIndex {
    * @return the satisfying leaf page ID
    */
   PageId findLeafPageNum(int val, Operator op);
+
+  /**
+   * Update the next entry with a key that lies within the search bound.
+   * The corresponding current page and page ID will be updated as well.
+   * A starting current page should possibly contain keys satisfying the lower search bound.
+   * The current page will be set to invalid if such entry does not exist.
+   * For convenience, the invalid next entry has an index -1.
+   * @return whether such entry exist or not.
+   */
+	bool updateScanEntry();
 
  public:
 
