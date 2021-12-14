@@ -395,6 +395,17 @@ class BTreeIndex {
   void insertRIDKeyPairAux(LeafNodeInt *leafIntPtr, int m, const RIDKeyPair<T> &rk, int pos);
 
   /**
+   * Insert the specified <pid, key> pair into the non leaf node.
+   * If the non leaf node is full, it will be split with a retrned pushed up <pid, key> pair.
+   * @param nodeIntPtr Non leaf node to insert into
+   * @param pk1 <pid, key> pair to insert
+   * @param pk2 <pid, key> pair to copy up
+   * @return whether the insertion completes without split or not
+   */
+  template <class T>
+  bool insertPageKeyPair(NonLeafNodeInt *nodeIntPtr, const PageKeyPair<T> &pk1, PageKeyPair<T> &pk2);
+
+  /**
    * Insert the specified <rid, key> pair into the leaf node.
    * If the leaf node is full, it will be split with a retrned copied up <pid, key> pair.
    * @param leafIntPtr Leaf node to insert into
